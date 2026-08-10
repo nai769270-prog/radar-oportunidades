@@ -1,0 +1,4 @@
+import {NextResponse} from 'next/server';
+import {getProject,getWorkspace,saveProject} from '../../../lib/store';
+import {createDeploymentPlan} from '../../../lib/deployment-plan';
+export async function POST(request){const {projectId,approved}=await request.json();if(approved!==true)return NextResponse.json({error:'explicit_approval_required'},{status:400});const project=getProject(projectId);if(!project)return NextResponse.json({error:'project_not_found'},{status:404});const plan=createDeploymentPlan(project,getWorkspace(projectId));if(!plan.ready)return NextResponse.json({error:plan.reason||'deployment_not_ready'},{status:400});const updated=saveProject({...project,deployment:{provider:'vercel',mode:'preview',status:'approved',approvedAt:new Date().toISOString(),projectName:plan.projectName,sourceArtifactId:plan.sourceArtifactId}});return NextResponse.json({data:updated.deployment,meta:{externalDeployExecuted:false}})}
