@@ -1,0 +1,5 @@
+import {NextResponse} from 'next/server';
+import {listOpportunityQueue,approveOpportunity,updateOpportunityQueueItem} from '../../../lib/opportunity-queue';
+export async function GET(){return NextResponse.json({data:await listOpportunityQueue()})}
+export async function POST(request){try{const body=await request.json();if(!body?.opportunity)return NextResponse.json({error:'opportunity_required'},{status:400});const result=await approveOpportunity(body.opportunity);return NextResponse.json({data:result.item,duplicate:result.duplicate},{status:result.duplicate?200:201})}catch(e){return NextResponse.json({error:e.message},{status:400})}}
+export async function PATCH(request){try{const body=await request.json();if(!body?.id)return NextResponse.json({error:'queue_item_id_required'},{status:400});const item=await updateOpportunityQueueItem(body.id,{status:body.status,actionId:body.actionId,actionStatus:body.actionStatus});if(!item)return NextResponse.json({error:'queue_item_not_found'},{status:404});return NextResponse.json({data:item})}catch(e){return NextResponse.json({error:e.message},{status:400})}}
