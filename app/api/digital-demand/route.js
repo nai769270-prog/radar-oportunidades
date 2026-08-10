@@ -1,0 +1,4 @@
+import {NextResponse} from 'next/server';
+import {analyzePublicDemand,productBrief,digitalDemandCategories} from '../../../lib/digital-demand';
+export async function GET(){return NextResponse.json({data:{categories:digitalDemandCategories,policy:{allowed:['tendências agregadas','posts e pedidos públicos','leads com opt-in','contatos comerciais publicados'],blocked:['histórico privado de pesquisa','inferência de condição de saúde individual','contato obtido de dados privados']}}})}
+export async function POST(request){const body=await request.json();const signals=analyzePublicDemand(Array.isArray(body.items)?body.items:[]);return NextResponse.json({data:signals.map(signal=>({...signal,product:productBrief(signal)})),meta:{inputCount:Array.isArray(body.items)?body.items.length:0,matched:signals.length}})}
