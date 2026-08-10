@@ -1,0 +1,8 @@
+import {NextResponse} from 'next/server';
+import {listRadarSources,markSourceCollection} from '../../../lib/radar-sources';
+import {collectRadarSource} from '../../../lib/source-collector';
+import {analyzePublicDemand} from '../../../lib/digital-demand';
+import {rankDemandSignals} from '../../../lib/demand-ranking';
+import {saveDemandSnapshot,getDemandTrends} from '../../../lib/demand-history';
+import {prioritizeHotOpportunities} from '../../../lib/hot-opportunity';
+export async function POST(){const sources=listRadarSources().filter(x=>x.status==='active');const collected=[];const report=[];for(const source of sources){try{const result=await collectRadarSource(source);collected.push(...result.items);markSourceCollection(source.id,{ok:true});report.push({sourceId:source.id,name:source.name,ok:true,count:result.items.length,skipped:result.skipped||false,reason:result.reason||null})}catch(e){markSourceCollection(source.id,{ok:false,error:e.message});report.push({sourceId:source.id,name:source.name,ok:false,count:0,error:e.message})}}const eligible=collected.filter(x=>['public','aggregate'].includes(x.signalType));const signals=analyzePublicDemand(eligible);const ranking=rankDemandSignals(signals);if(ranking.length)saveDemandSnapshot(ranking);const trendMap=new Map(getDemandTrends().map(x=>[x.categoryId,x]));const opportunities=prioritizeHotOpportunities(ranking.map(x=>({...x,trend:trendMap.get(x.categoryId)||null})));return NextResponse.json({data:{opportunities,signals,collected:eligible,report},meta:{sources:sources.length,collected:eligible.length,matched:signals.length,privacy:'Ranking comercial usa somente sinais públicos/agregados. Leads com opt-in ficam separados do ranking de demanda.'}})}
