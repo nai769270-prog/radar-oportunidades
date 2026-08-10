@@ -1,0 +1,3 @@
+import {NextResponse} from 'next/server';
+import {getProject,updateProjectRequirements} from '../../../lib/store';
+export async function POST(request){const {projectId,requirements}=await request.json();if(!getProject(projectId))return NextResponse.json({error:'project_not_found'},{status:404});const clean={businessName:String(requirements?.businessName||'').trim(),businessType:String(requirements?.businessType||'').trim(),services:String(requirements?.services||'').trim(),prices:String(requirements?.prices||'').trim(),hours:String(requirements?.hours||'').trim(),faq:String(requirements?.faq||'').trim(),goal:String(requirements?.goal||'').trim(),tone:String(requirements?.tone||'').trim()};return NextResponse.json({data:updateProjectRequirements(projectId,clean)})}
