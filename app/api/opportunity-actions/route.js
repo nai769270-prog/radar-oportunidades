@@ -1,0 +1,3 @@
+import {NextResponse} from 'next/server';
+import {buildOpportunityActionPlan} from '../../../lib/opportunity-actions';
+export async function POST(request){try{const body=await request.json();const opportunity=body?.opportunity;if(!opportunity||typeof opportunity!=='object')return NextResponse.json({error:'opportunity_required'},{status:400});const plan=buildOpportunityActionPlan(opportunity);return NextResponse.json({data:plan,meta:{execution:'review_required',note:'A API prepara próximos passos; não publica, não envia contato e não cria gasto automaticamente.'}})}catch(e){return NextResponse.json({error:e.message},{status:400})}}
