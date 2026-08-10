@@ -1,0 +1,3 @@
+import {NextResponse} from 'next/server';
+import {persistenceConfigured} from '../../../lib/persistence';
+export async function GET(){const checks={persistence:persistenceConfigured(),cron:Boolean(process.env.CRON_SECRET),mercadoPago:Boolean(process.env.MERCADOPAGO_ACCESS_TOKEN&&process.env.MERCADOPAGO_WEBHOOK_SECRET),email:Boolean(process.env.EMAIL_PROVIDER&&process.env.EMAIL_FROM&&(process.env.EMAIL_PROVIDER!=='resend'||process.env.RESEND_API_KEY)),appUrl:Boolean(process.env.APP_URL)};const ready=Object.values(checks).every(Boolean);return NextResponse.json({data:{ready,checks,mode:ready?'production_ready':'configuration_required'},meta:{secretsExposed:false}})}
