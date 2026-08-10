@@ -1,0 +1,4 @@
+import {NextResponse} from 'next/server';
+import {getProject,saveChannelLifecycle} from '../../../lib/store';
+import {initialChannelLifecycle,nextChannelLifecycle} from '../../../lib/channel-lifecycle';
+export async function POST(request){const {projectId,action}=await request.json();const project=getProject(projectId);if(!project)return NextResponse.json({error:'project_not_found'},{status:404});let lifecycle=project.channelLifecycle||initialChannelLifecycle(project);if(!lifecycle)return NextResponse.json({error:'channel_not_supported'},{status:400});try{lifecycle=nextChannelLifecycle(lifecycle,action);const updated=saveChannelLifecycle(projectId,lifecycle);return NextResponse.json({data:updated.channelLifecycle,meta:{externalConnectionExecuted:false,simulationOnly:action==='connect'||action==='test'}})}catch(e){return NextResponse.json({error:e.message},{status:400})}}
