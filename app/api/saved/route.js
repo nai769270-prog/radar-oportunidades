@@ -2,19 +2,12 @@ import { NextResponse } from 'next/server';
 import { listSavedOpportunities, saveOpportunity, updateOpportunityStatus } from '../../../lib/store';
 import { filterUsableContacts } from '../../../lib/contact-policy';
 const allowedStatuses=new Set(['new','analyzing','approved','discarded']);
-export async function GET(){ return NextResponse.json({ data: listSavedOpportunities() }); }
-export async function POST(request){
-  const body = await request.json();
-  if (!body.id || !body.title) return NextResponse.json({ error: 'invalid_opportunity' }, { status: 400 });
-  const existing=listSavedOpportunities().find(x=>String(x.id)===String(body.id));
-  const safe = { ...body, status:allowedStatuses.has(body.status)?body.status:(existing?.status||'new'), contacts: filterUsableContacts(body.contacts || []), savedAt: existing?.savedAt||new Date().toISOString(), lastSeenAt:new Date().toISOString() };
-  const data=saveOpportunity(safe);
-  return NextResponse.json({ data, duplicate:Boolean(existing), updated:Boolean(existing) }, { status: existing?200:201 });
-}
-export async function PATCH(request){
-  const body=await request.json();
-  if(!body.id||!allowedStatuses.has(body.status))return NextResponse.json({error:'invalid_status_update'},{status:400});
-  const data=updateOpportunityStatus(body.id,body.status);
-  if(!data)return NextResponse.json({error:'opportunity_not_found'},{status:404});
-  return NextResponse.json({data});
-}
+function norm(v=''){return String(v||'').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/https?:\/\/\S+/g,' ').replace(/[^a-z0-9 ]/g,' ').replace(/\s+/g,' ').trim()}
+function canonicalUrl(v=''){try{const u=new URL(v);u.hash='';['utm_source','utm_medium','utm_campaign','utm_term','utm_content','fbclid','gclid'].forEach(k=>u.searchParams.delete(k));return `${u.hostname.replace(/^www\./,'')}${u.pathname}${u.search}`.replace(/\/$/,'')}catch{return ''}}
+function host(v=''){try{return new URL(v).hostname.replace(/^www\./,'')}catch{return ''}}
+function words(x={}){return new Set(norm(`${x.title||x.category||''} ${x.problem||x.text||x.evidence||''}`).split(' ').filter(w=>w.length>3).slice(0,50))}
+function similarity(a,b){const A=words(a),B=words(b);if(!A.size||!B.size)return 0;let n=0;for(const w of A)if(B.has(w))n++;return n/Math.min(A.size,B.size)}
+function match(saved,item){const itemUrl=item.sourceUrl||item.source?.url||'';return saved.find(x=>String(x.id)===String(item.id))||saved.find(x=>{const xUrl=x.sourceUrl||x.source?.url||'';return itemUrl&&xUrl&&canonicalUrl(itemUrl)===canonicalUrl(xUrl)})||saved.find(x=>{const xUrl=x.sourceUrl||x.source?.url||'';return itemUrl&&xUrl&&host(itemUrl)===host(xUrl)&&similarity(x,item)>=.72})||saved.find(x=>similarity(x,item)>=.86)||null}
+export async function GET(request){const saved=listSavedOpportunities();const url=new URL(request.url);if(url.searchParams.get('match')!=='1')return NextResponse.json({data:saved});let items=[];try{items=JSON.parse(url.searchParams.get('items')||'[]')}catch{}return NextResponse.json({data:items.map(item=>{const found=match(saved,item);return {id:item.id||null,matched:Boolean(found),matchedId:found?.id||null,status:found?.status||null,matchType:found?(String(found.id)===String(item.id)?'id':canonicalUrl(found.sourceUrl||found.source?.url||'')&&canonicalUrl(found.sourceUrl||found.source?.url||'')===canonicalUrl(item.sourceUrl||item.source?.url||'')?'url':'similarity'):null}})})}
+export async function POST(request){const body=await request.json();if(!body.id||!body.title)return NextResponse.json({error:'invalid_opportunity'},{status:400});const all=listSavedOpportunities(),existing=match(all,body);const canonicalId=existing?.id||body.id;const safe={...body,id:canonicalId,status:allowedStatuses.has(body.status)?body.status:(existing?.status||'new'),contacts:filterUsableContacts(body.contacts||[]),savedAt:existing?.savedAt||new Date().toISOString(),lastSeenAt:new Date().toISOString(),aliases:[...new Set([...(existing?.aliases||[]),body.id].filter(Boolean))]};const data=saveOpportunity(safe);return NextResponse.json({data,duplicate:Boolean(existing),updated:Boolean(existing),matchedBy:existing?(String(existing.id)===String(body.id)?'id':'semantic'):null},{status:existing?200:201})}
+export async function PATCH(request){const body=await request.json();if(!body.id||!allowedStatuses.has(body.status))return NextResponse.json({error:'invalid_status_update'},{status:400});const data=updateOpportunityStatus(body.id,body.status);if(!data)return NextResponse.json({error:'opportunity_not_found'},{status:404});return NextResponse.json({data})}
